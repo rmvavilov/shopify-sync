@@ -4,7 +4,11 @@ namespace App\Shopify\Services;
 
 use App\Models\Product;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SyncService
 {
@@ -21,40 +25,77 @@ class SyncService
             throw new \InvalidArgumentException('Product node is missing "id".');
         }
 
-        $incomingIso = Arr::get($node, 'updatedAt'); // ISO8601
+        $incomingIso = Arr::get($node, 'updatedAt'); // ISO8601|null
         $incomingTs = $incomingIso ? Carbon::parse($incomingIso) : null;
 
-        $existing = Product::where('shopify_id', $gid)->first();
-
-        $shouldWrite = !$existing
-            || !$existing->remote_updated_at
-            || ($incomingTs && $incomingTs->gt($existing->remote_updated_at));
-
         $business = $this->mapNodeToData($node);
-
-        $meta = [
-            'remote_updated_at' => $incomingIso,
+        $metaCommon = [
             'last_synced_at' => now(),
             'last_sync_source' => $source,
             'last_webhook_id' => $webhookId,
         ];
 
-        if ($shouldWrite) {
-            return Product::updateOrCreate(
-                ['shopify_id' => $gid],
-                array_merge($business, $meta)
-            );
-        }
+        $usesSoftDeletes = in_array(SoftDeletes::class, class_uses_recursive(Product::class), true);
 
-        if ($existing) {
-            $existing->forceFill($meta)->save();
-            return $existing;
-        }
+        return DB::transaction(function () use (
+            $gid, $incomingIso, $incomingTs, $business, $metaCommon, $usesSoftDeletes
+        ) {
+            $q = Product::query();
+            if ($usesSoftDeletes) {
+                $q->withTrashed();
+            }
+            $existing = $q->where('shopify_id', $gid)->first();
 
-        return Product::updateOrCreate(
-            ['shopify_id' => $gid],
-            array_merge($business, $meta)
-        );
+            if ($existing) {
+                if ($usesSoftDeletes && method_exists($existing, 'trashed') && $existing->trashed()) {
+                    $existing->restore();
+                }
+
+                $shouldWrite = !$existing->remote_updated_at
+                    || ($incomingTs && $incomingTs->gt($existing->remote_updated_at));
+
+                if ($shouldWrite) {
+                    $existing->fill(array_merge(
+                        $business,
+                        $metaCommon,
+                        ['remote_updated_at' => $incomingIso]
+                    ))->save();
+                } else {
+                    $existing->forceFill($metaCommon)->save();
+                }
+
+                return $existing->refresh();
+            }
+
+            try {
+                return Product::create(array_merge(
+                    ['shopify_id' => $gid],
+                    $business,
+                    $metaCommon,
+                    ['remote_updated_at' => $incomingIso]
+                ));
+            } catch (QueryException $e) {
+                if (Str::contains($e->getMessage(), 'Duplicate entry') && Str::contains($e->getMessage(), 'shopify_id')) {
+                    $found = Product::query()->where('shopify_id', $gid)->first();
+                    if ($found) {
+                        $shouldWrite = !$found->remote_updated_at
+                            || ($incomingTs && $incomingTs->gt($found->remote_updated_at));
+
+                        if ($shouldWrite) {
+                            $found->fill(array_merge(
+                                $business,
+                                $metaCommon,
+                                ['remote_updated_at' => $incomingIso]
+                            ))->save();
+                        } else {
+                            $found->forceFill($metaCommon)->save();
+                        }
+                        return $found->refresh();
+                    }
+                }
+                throw $e;
+            }
+        });
     }
 
     protected function mapNodeToData(array $node): array

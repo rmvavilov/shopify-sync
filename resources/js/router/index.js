@@ -1,5 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import {createRouter, createWebHistory} from 'vue-router'
+import {useUserStore} from '@/stores/user'
 import Login from '@/views/Login.vue'
 import Dashboard from '@/views/Dashboard.vue'
 // import Products from '@/views/Products.vue'
@@ -7,12 +7,24 @@ import ProductsLive from '@/views/ProductsLive.vue'
 import ProductsLocal from '@/views/ProductsLocal.vue'
 
 const routes = [
-    { path: '/login', name: 'login', component: Login, meta: { guestOnly: true } },
-    { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true } },
+    {path: '/login', name: 'login', component: Login, meta: {guestOnly: true}},
+    {path: '/dashboard', name: 'dashboard', component: Dashboard, meta: {requiresAuth: true}},
     // { path: '/products', name: 'products', component: Products, meta: { requiresAuth: true } },
-    { path: '/products-live',  name: 'products-live',  component: ProductsLive,  meta: { requiresAuth: true } },
-    { path: '/products-local', name: 'products-local', component: ProductsLocal, meta: { requiresAuth: true } },
-    { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
+    {path: '/products-live', name: 'products-live', component: ProductsLive, meta: {requiresAuth: true}},
+    {path: '/products-local', name: 'products-local', component: ProductsLocal, meta: {requiresAuth: true}},
+
+    {
+        path: '/products-live/:id',
+        name: 'products-live-details',
+        component: () => import('@/views/ProductsLiveDetailsPage.vue')
+    },
+    {
+        path: '/products-local/:id',
+        name: 'products-local-details',
+        component: () => import('@/views/ProductsLocalDetailsPage.vue')
+    },
+
+    {path: '/:pathMatch(.*)*', redirect: '/dashboard'},
 ]
 
 const router = createRouter({
@@ -27,10 +39,10 @@ router.beforeEach(async (to, from) => {
     }
 
     if (to.meta.requiresAuth && !user.isAuthenticated) {
-        return { name: 'login' }
+        return {name: 'login'}
     }
     if (to.meta.guestOnly && user.isAuthenticated) {
-        return { name: 'dashboard' }
+        return {name: 'dashboard'}
     }
 })
 

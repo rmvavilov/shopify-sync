@@ -92,6 +92,12 @@
             >
                 Open
             </v-btn>
+            <RouterLink
+                :to="detailsRoute(item)"
+                class="text-primary font-weight-medium text-decoration-none"
+            >
+                Details
+            </RouterLink>
         </template>
 
         <template #loading>
@@ -119,6 +125,18 @@ import {
     formatDateTime,
     statusColor,
 } from '@/utils/productHelpers.js'
+import { gidEncode } from '@/utils/gid.js'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+function detailsRoute(item) {
+    const id64 = gidEncode(item.id)
+
+    const live = route.name?.toString().includes('live')
+    return live
+        ? { name: 'products-live-details', params: { id: id64 } }
+        : { name: 'products-local-details', params: { id: id64 } }
+}
 
 const props = defineProps({
     headers: {type: Array, default: () => null},

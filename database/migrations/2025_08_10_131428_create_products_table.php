@@ -44,6 +44,8 @@ return new class extends Migration {
 
             $table->timestamp('remote_updated_at')->nullable()->index();
             $table->timestamp('last_synced_at')->nullable()->index();
+
+            $table->softDeletes();
             $table->timestamps();
         });
     }
