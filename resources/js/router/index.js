@@ -1,13 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useUserStore } from '../stores/user'
-import Login from '../views/Login.vue'
-import Dashboard from '../views/Dashboard.vue'
-import Products from '../views/Products.vue'
+import { useUserStore } from '@/stores/user'
+import Login from '@/views/Login.vue'
+import Dashboard from '@/views/Dashboard.vue'
+// import Products from '@/views/Products.vue'
+import ProductsLive from '@/views/ProductsLive.vue'
+import ProductsLocal from '@/views/ProductsLocal.vue'
 
 const routes = [
     { path: '/login', name: 'login', component: Login, meta: { guestOnly: true } },
     { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true } },
-    { path: '/products', name: 'products', component: Products, meta: { requiresAuth: true } },
+    // { path: '/products', name: 'products', component: Products, meta: { requiresAuth: true } },
+    { path: '/products-live',  name: 'products-live',  component: ProductsLive,  meta: { requiresAuth: true } },
+    { path: '/products-local', name: 'products-local', component: ProductsLocal, meta: { requiresAuth: true } },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 

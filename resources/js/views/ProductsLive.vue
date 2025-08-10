@@ -1,0 +1,36 @@
+<template>
+    <div>
+        <div class="d-flex align-center mb-4" style="gap: 8px;">
+            <v-btn color="primary" @click="reload" :loading="loading" prepend-icon="mdi-refresh">Reload</v-btn>
+            <v-spacer/>
+            <v-text-field
+                v-model="q"
+                density="compact"
+                variant="outlined"
+                prepend-inner-icon="mdi-magnify"
+                label="Search (Shopify)"
+                clearable
+                hide-details
+                style="max-width: 320px"
+            />
+        </div>
+
+        <ProductTable
+            :items="items"
+            :items-length="itemsLength"
+            :loading="loading"
+            :options="options"
+            @update:options="onUpdateOptions"
+        />
+    </div>
+</template>
+
+<script setup>
+import ProductTable from '@/components/ProductTable.vue'
+import {useProductsLive} from '@/composables/useProductsLive.js'
+import {onMounted} from 'vue'
+
+const {items, itemsLength, loading, q, options, reload, onUpdateOptions} = useProductsLive()
+
+onMounted(() => reload())
+</script>

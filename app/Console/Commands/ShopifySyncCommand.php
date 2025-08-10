@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Shopify\Services\SyncService as ShopifySyncService;
+use App\Shopify\Client\ShopifyClient;
 use Illuminate\Console\Command;
-use App\Services\ShopifyClient;
-use App\Services\ShopifySyncService;
 
 class ShopifySyncCommand extends Command
 {

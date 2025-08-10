@@ -12,8 +12,10 @@ Route::get('/api/me', [AuthController::class, 'me'])->name('me');
 
 Route::middleware('auth:web')->group(function () {
     Route::get('/api/shopify/products', [ShopifyController::class, 'products']);
+    Route::get('/api/shopify/products/proxy', [ShopifyController::class, 'productsProxy']);
+    Route::get('/api/shopify/products/local', [ShopifyController::class, 'productsLocal']);
 
-    Route::get('/api/some-protected-endpoint', fn () => response()->json(['ok' => true]));
+        Route::get('/api/some-protected-endpoint', fn () => response()->json(['ok' => true]));
 });
 
 Route::post('/api/webhooks/shopify/products/create', [WebhookController::class, 'productCreate']);

@@ -1,15 +1,37 @@
 <template>
     <v-app>
         <v-app-bar flat>
-            <v-app-bar-title>Laravel/Vue/Vuetify/Shopify</v-app-bar-title>
+            <v-app-bar-title>
+                Shopify Sync
+                <v-chip class="ml-3" size="small" variant="tonal">v{{ appVersion }}</v-chip>
+            </v-app-bar-title>
 
             <template v-if="user.isAuthenticated">
                 <v-btn variant="text" :to="{ name: 'dashboard' }">Dashboard</v-btn>
-                <v-btn variant="text" :to="{ name: 'products' }">Products</v-btn>
+                <v-btn
+                    :to="{ name: 'products-live' }"
+                    variant="outlined"
+                    color="red"
+                    rounded="lg"
+                    class="mr-2"
+                >
+                    Products
+                    <v-chip color="red" size="small" variant="tonal" class="ml-2" label>live</v-chip>
+                </v-btn>
+                <v-btn
+                    variant="outlined"
+                    color="blue"
+                    rounded="lg"
+                    class="mr-2"
+                    :to="{ name: 'products-local' }"
+                >
+                    Products
+                    <v-chip color="blue" size="small" variant="tonal" class="ml-2" label>local</v-chip>
+                </v-btn>
             </template>
 
 
-            <v-spacer />
+            <v-spacer/>
 
             <template v-if="user.isAuthenticated">
                 <v-chip class="mr-2" prepend-icon="mdi-account" color="primary" variant="tonal">
@@ -24,14 +46,19 @@
 
         <v-main>
             <v-container class="py-6">
-                <RouterView />
+                <RouterView/>
             </v-container>
         </v-main>
     </v-app>
 </template>
 
 <script setup>
-import { useUserStore } from '../stores/user'
+import {useUserStore} from '@/stores/user'
+
+const appVersion = document
+    .querySelector('meta[name="app-version"]')
+    ?.getAttribute('content') || 'dev'
+
 const user = useUserStore()
 
 const onLogout = async () => {

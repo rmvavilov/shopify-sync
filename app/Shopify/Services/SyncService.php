@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Services;
+namespace App\Shopify\Services;
 
 use App\Models\Product;
 
-class ShopifySyncService
+class SyncService
 {
     public function upsertFromShopifyNode(array $node): Product
     {
@@ -15,7 +15,7 @@ class ShopifySyncService
             [
                 'title' => $node['title'] ?? '',
                 'description' => $node['descriptionHtml'] ?? '',
-                'category' => $node['productType'] ?? null,
+                'productType' => $node['productType'] ?? null,
             ]
         );
     }

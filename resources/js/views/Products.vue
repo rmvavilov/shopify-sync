@@ -15,13 +15,17 @@
             />
         </div>
 
-        <v-data-table
+        <v-data-table-server
             :headers="headers"
-            :items="filteredItems"
+            :items="items"
+            :items-length="itemsLength"
+            v-model:page="options.page"
+            v-model:items-per-page="options.itemsPerPage"
+            v-model:sort-by="options.sortBy"
             :loading="loading"
-            :items-per-page="10"
-            class="elevation-1"
             hover
+            class="elevation-1"
+            @update:options="onUpdateOptions"
         >
             <template #item.image="{ item }">
                 <v-avatar size="48" rounded="lg">
@@ -88,14 +92,15 @@
             <template #no-data>
                 <v-alert type="info" variant="tonal">No products - reload.</v-alert>
             </template>
-        </v-data-table>
+        </v-data-table-server>
     </div>
 </template>
 
 <script setup>
-import {ref, computed, onMounted} from 'vue'
+import {ref, reactive, watch, onMounted} from 'vue'
 
 const items = ref([])
+const itemsLength = ref(0)
 const loading = ref(false)
 const q = ref('')
 const mode = ref('proxy') // TODO: remove hardcode fetch from backend
@@ -103,32 +108,22 @@ const placeholder = 'https://via.placeholder.com/120x120?text=No+Image'
 
 const headers = [
     {title: 'Image', key: 'image', sortable: false},
-    {title: 'Title', key: 'title'},
-    {title: 'Category', key: 'category'},
-    {title: 'Price', key: 'priceSort'},
-    {title: 'Total', key: 'total'},
-    {title: 'Status', key: 'status'},
+    {title: 'Title', key: 'title', sortable: true},
+    {title: 'Category', key: 'category', sortable: true},
+    {title: 'Price', key: 'priceSort', sortable: false},
+    {title: 'Total', key: 'total', sortable: false},
+    {title: 'Status', key: 'status', sortable: false},
     {title: 'Actions', key: 'actions', sortable: false},
 ]
 
-const filteredItems = computed(() => {
-    const needle = q.value.trim().toLowerCase()
-    if (!needle) return withComputed(items.value)
-    return withComputed(items.value).filter(p =>
-        (p.title || '').toLowerCase().includes(needle) ||
-        (p.category || '').toLowerCase().includes(needle) ||
-        (p.handle || '').toLowerCase().includes(needle) ||
-        (p.status || '').toLowerCase().includes(needle)
-    )
+const options = reactive({
+    page: 1,
+    itemsPerPage: 10,
+    sortBy: [{key: 'updated_at', order: 'desc'}],
 })
 
-function withComputed(arr) {
-    return arr.map(p => ({
-        ...p,
-        // priceSort: min price if exists; else variant.price; else null
-        priceSort: priceMin(p) ?? null,
-    }))
-}
+const pageCursors = reactive({1: {start: null, end: null}})
+const lastLoadedPage = ref(1)
 
 const priceMin = (p) => {
     if (p?.priceMin != null) return Number(p.priceMin)
@@ -137,7 +132,6 @@ const priceMin = (p) => {
 }
 const priceMax = (p) => (p?.priceMax != null ? Number(p.priceMax) : null)
 const currency = (p) => p?.currency || p?.variant?.currency || undefined
-
 const money = (amount, curr) => {
     if (amount == null) return '—'
     try {
@@ -151,9 +145,7 @@ const money = (amount, curr) => {
         return String(amount)
     }
 }
-
 const publicUrl = (p) => p?.onlineStoreUrl || p?.onlineStorePreviewUrl || null
-
 const statusColor = (s) => {
     switch ((s || '').toUpperCase()) {
         case 'ACTIVE':
@@ -167,36 +159,102 @@ const statusColor = (s) => {
     }
 }
 
-const load = async () => {
+function computeVirtualTotal(page, perPage, pageInfo, countThisPage) {
+    return (page - 1) * perPage + (pageInfo?.hasNextPage ? perPage + 1 : countThisPage)
+}
+
+async function fetchServerData(opts, nav = {}) {
     loading.value = true
     try {
-        const res = await fetch('/api/shopify/products', {credentials: 'same-origin'})
+        const params = new URLSearchParams()
+        params.set('page', String(opts.page))
+        params.set('itemsPerPage', String(opts.itemsPerPage))
+
+        const allowedSortKeys = new Set(['title', 'category', 'created_at', 'updated_at', 'id'])
+        const sort0 = (opts.sortBy?.[0] && allowedSortKeys.has(opts.sortBy[0].key)) ? opts.sortBy[0] : null
+        if (sort0) {
+            params.append('sortBy[0][key]', sort0.key)
+            params.append('sortBy[0][order]', sort0.order === 'asc' ? 'asc' : 'desc')
+        }
+
+        if (q.value) params.set('q', q.value)
+
+        if (mode.value === 'proxy') {
+            if (nav.direction === 'next' && nav.after) {
+                params.set('after', nav.after)
+            }
+            if (nav.direction === 'prev' && nav.before) {
+                params.set('before', nav.before)
+                params.set('direction', 'prev')
+            }
+        }
+
+        const res = await fetch(`/api/shopify/products?${params.toString()}`, {credentials: 'same-origin'})
         if (!res.ok) throw new Error('Failed to load products')
         const data = await res.json()
-        const a = Array.isArray(data) ? data : []
-        console.log(a)
-        items.value = a
+
+        if (Array.isArray(data)) {
+            mode.value = 'legacy'
+            items.value = data
+            itemsLength.value = data.length
+            lastLoadedPage.value = opts.page
+            return
+        }
+
+        mode.value = data.mode || 'proxy'
+        items.value = data.items || []
+
+        if (mode.value === 'local') {
+            itemsLength.value = Number(data.total || 0)
+        } else {
+            const info = data.pageInfo || null
+
+            pageCursors[opts.page] = {
+                start: info?.startCursor || null,
+                end: info?.endCursor || null,
+            }
+            itemsLength.value = computeVirtualTotal(opts.page, opts.itemsPerPage, info, items.value.length)
+        }
+
+        lastLoadedPage.value = opts.page
     } catch (e) {
         console.error(e)
         items.value = []
+        itemsLength.value = 0
     } finally {
         loading.value = false
     }
 }
 
-const sync = async () => {
-    //TODO: add sync shopify command trigger
-    syncing.value = true
-    try {
-        await load()
-    } finally {
-        syncing.value = false
+function onUpdateOptions(newOpts) {
+    let nav = {}
+    if (mode.value === 'proxy') {
+        if (newOpts.page > lastLoadedPage.value) {
+            nav = {direction: 'next', after: pageCursors[lastLoadedPage.value]?.end || null}
+        } else if (newOpts.page < lastLoadedPage.value) {
+            nav = {
+                direction: 'prev',
+                before: pageCursors[newOpts.page]?.start || pageCursors[lastLoadedPage.value]?.start || null
+            }
+        }
     }
+    fetchServerData(newOpts, nav)
 }
 
-const remove = async (p) => {
-    //TODO: add delete product
+function reload() {
+    Object.keys(pageCursors).forEach(k => delete pageCursors[k])
+    pageCursors[1] = {start: null, end: null}
+    options.page = 1
+    fetchServerData(options, {})
 }
 
-onMounted(load)
+const load = () => reload()
+
+watch(q, () => {
+    reload()
+})
+
+onMounted(() => {
+    fetchServerData(options, {})
+})
 </script>

@@ -1,20 +1,20 @@
 <?php
 
-namespace App\Services;
+namespace App\Shopify\Client;
 
 use Illuminate\Support\Facades\Http;
 
 class ShopifyClient
 {
-    protected string $domain;
-    protected string $token;
-    protected string $version;
-
-    public function __construct()
+    public function __construct(
+        private ?string $domain = null,
+        private ?string $token = null,
+        private ?string $version = null,
+    )
     {
-        $this->domain  = rtrim(config('services.shopify.domain'), '/');
-        $this->token   = config('services.shopify.token');
-        $this->version = config('services.shopify.version');
+        $this->domain ??= rtrim(config('services.shopify.domain'), '/');
+        $this->token ??= config('services.shopify.token');
+        $this->version ??= config('services.shopify.version', '2025-04');
     }
 
     public function graphql(string $query, array $variables = []): array
