@@ -7,6 +7,7 @@ use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\ProductDetailsController;
 use App\Http\Controllers\ProductSyncController;
 use App\Http\Controllers\ProductLiveMutationsController;
+use App\Http\Controllers\ShopifyFullSyncController;
 
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -25,10 +26,13 @@ Route::middleware('auth:web')->group(function () {
     Route::post('/api/shopify/products/live/{id64}/update', [ProductLiveMutationsController::class, 'update']);
     Route::delete('/api/shopify/products/live/{id64}', [ProductLiveMutationsController::class, 'destroy']);
 
-    Route::get('/api/some-protected-endpoint', fn() => response()->json(['ok' => true]));
-    Route::get('/api/some-protected-endpoint', function () {
-        return response()->json(['ok' => true]);
-    });
+    Route::post('/api/shopify/sync-all', [ShopifyFullSyncController::class, 'syncAll']);
+
+
+//    Route::get('/api/some-protected-endpoint', fn() => response()->json(['ok' => true]));
+//    Route::get('/api/some-protected-endpoint', function () {
+//        return response()->json(['ok' => true]);
+//    });
 });
 
 Route::post('/api/webhooks/shopify/products/create', [WebhookController::class, 'productCreate']);
