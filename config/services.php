@@ -36,10 +36,14 @@ return [
     ],
 
     'shopify' => [
-        'domain'  => env('SHOPIFY_SHOP_DOMAIN'),
-        'token'   => env('SHOPIFY_ADMIN_TOKEN'),
+        'domain' => env('SHOPIFY_SHOP_DOMAIN'),
+        'token' => env('SHOPIFY_ADMIN_TOKEN'),
         'version' => env('SHOPIFY_API_VERSION', '2025-07'),
-        'mode'    => env('SHOPIFY_MODE', 'proxy'), // proxy | local
+        'mode' => env('SHOPIFY_MODE', 'proxy'), // proxy | local
+        'sync' => [
+            'driver' => env('SHOPIFY_SYNC_DRIVER', 'job'),
+            'timeout' => (int)env('SHOPIFY_SYNC_TIMEOUT', 0),
+        ]
     ],
 
 ];
