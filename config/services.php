@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'shopify' => [
+        'domain'  => env('SHOPIFY_SHOP_DOMAIN'),
+        'token'   => env('SHOPIFY_ADMIN_TOKEN'),
+        'version' => env('SHOPIFY_API_VERSION', '2025-07'),
+        'mode'    => env('SHOPIFY_MODE', 'proxy'), // proxy | local
+    ],
+
 ];
