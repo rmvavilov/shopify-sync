@@ -1,12 +1,12 @@
 <?php
 
-
 namespace App\Shopify\Services;
 
 use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Shopify\Client\ShopifyClient;
 use App\Shopify\Transformers\ProductTransformer;
+use App\Shopify\Queries\ProductFragments;
 use Illuminate\Support\Arr;
 
 class ProductsService
@@ -24,9 +24,9 @@ class ProductsService
         $per = min(max((int)$request->integer('itemsPerPage', 10), 1), 100);
         $q = trim((string)$request->get('q', ''));
         $sortBy = (array)$request->input('sortBy', []);
-        $primarySort = $sortBy[0] ?? ['key' => 'updated_at', 'order' => 'desc'];
-        $key = (string)($primarySort['key'] ?? 'updated_at');
-        $dir = strtolower((string)($primarySort['order'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+        $primary = $sortBy[0] ?? ['key' => 'updated_at', 'order' => 'desc'];
+        $key = (string)($primary['key'] ?? 'updated_at');
+        $dir = strtolower((string)($primary['order'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $qb = Product::query();
 
@@ -68,10 +68,10 @@ class ProductsService
     {
         $per = min(max((int)$request->integer('itemsPerPage', 10), 1), 100);
         $q = trim((string)$request->get('q', ''));
-        $sortBy = $request->input('sortBy', []);
-        $primarySort = $sortBy[0] ?? ['key' => 'updated_at', 'order' => 'desc'];
-        $key = $primarySort['key'] ?? 'updated_at';
-        $dir = ($primarySort['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        $sortBy = (array)$request->input('sortBy', []);
+        $primary = $sortBy[0] ?? ['key' => 'updated_at', 'order' => 'desc'];
+        $key = (string)($primary['key'] ?? 'updated_at');
+        $dir = strtolower((string)($primary['order'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $sortKeyMap = [
             'title' => 'TITLE',
@@ -95,15 +95,19 @@ class ProductsService
             $vars['before'] = $before;
         } else {
             $vars['first'] = $per;
-            if ($after) $vars['after'] = $after;
+            if ($after) {
+                $vars['after'] = $after;
+            }
         }
 
+        // Простой поиск по title/product_type
         if ($q !== '') {
             $safe = str_replace(['"', "'"], '', $q);
             $vars['query'] = "title:*{$safe}* OR product_type:*{$safe}*";
         }
 
-        $query = <<<'GQL'
+        // ЕДИНЫЙ набор полей через общий фрагмент
+        $gql = ProductFragments::fields() . <<<'GQL'
 query GetProducts(
   $first:Int, $last:Int, $after:String, $before:String,
   $sortKey: ProductSortKeys, $reverse:Boolean, $query:String
@@ -113,50 +117,13 @@ query GetProducts(
     pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
     edges {
       cursor
-      node {
-        id title descriptionHtml handle status
-        onlineStoreUrl onlineStorePreviewUrl productType totalInventory
-        priceRangeV2 {
-          minVariantPrice { amount currencyCode }
-          maxVariantPrice { amount currencyCode }
-        }
-        featuredMedia {
-          ... on MediaImage {
-            image   { url(transform:{maxWidth:360}) altText width height }
-            preview { image { url(transform:{maxWidth:800}) altText width height } }
-          }
-          ... on Video        { preview { image { url(transform:{maxWidth:800}) altText width height } } }
-          ... on ExternalVideo{ preview { image { url(transform:{maxWidth:800}) altText width height } } }
-          ... on Model3d      { preview { image { url(transform:{maxWidth:800}) altText width height } } }
-        }
-        media(first:2) {
-          nodes {
-            ... on MediaImage {
-              image   { url(transform:{maxWidth:800}) altText width height }
-              preview { image { url(transform:{maxWidth:800}) altText width height } }
-            }
-            ... on Video        { preview { image { url(transform:{maxWidth:800}) altText width height } } }
-            ... on ExternalVideo{ preview { image { url(transform:{maxWidth:800}) altText width height } } }
-            ... on Model3d      { preview { image { url(transform:{maxWidth:800}) altText width height } } }
-          }
-        }
-        variants(first:1) {
-          edges {
-            node {
-              id
-              price
-              compareAtPrice
-              image { url(transform:{maxWidth:800}) altText width height }
-            }
-          }
-        }
-      }
+      node { ...ProductFields }
     }
   }
 }
 GQL;
 
-        $data = $this->client->graphql($query, $vars);
+        $data = $this->client->graphql($gql, $vars);
 
         $conn = Arr::get($data, 'data.products');
         $shopCurr = Arr::get($data, 'data.shop.currencyCode');

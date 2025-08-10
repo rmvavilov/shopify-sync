@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Carbon;
 
 class Product extends Model
 {
@@ -27,6 +28,10 @@ class Product extends Model
         'variant_price',
         'variant_compare_at',
         'variant_image',
+        'remote_updated_at',
+        'last_synced_at',
+        'last_sync_source',
+        'last_webhook_id',
     ];
 
     protected $casts = [
@@ -35,26 +40,44 @@ class Product extends Model
         'price_max' => 'float',
         'variant_price' => 'float',
         'variant_compare_at' => 'float',
+        'remote_updated_at' => 'datetime',
+        'last_synced_at' => 'datetime',
     ];
 
     protected $hidden = [
         'id',
         'product_type',
         'total_inventory',
-        'price_min', 'price_max',
-        'image_alt', 'image_variant',
-        'online_store_url', 'online_store_preview_url',
-        'variant_id', 'variant_price', 'variant_compare_at', 'variant_image',
-        'created_at', 'updated_at',
+        'price_min',
+        'price_max',
+        'image_alt',
+        'image_variant',
+        'online_store_url',
+        'online_store_preview_url',
+        'variant_id',
+        'variant_price',
+        'variant_compare_at',
+        'variant_image',
+        'remote_updated_at',
+        'last_synced_at',
+        'last_sync_source',
+        'last_webhook_id',
+        'created_at',
+        'updated_at',
     ];
 
     protected $appends = [
         'category',
         'total',
-        'priceMin', 'priceMax',
-        'imageAlt', 'imageVariant',
-        'onlineStoreUrl', 'onlineStorePreviewUrl',
+        'priceMin',
+        'priceMax',
+        'imageAlt',
+        'imageVariant',
+        'onlineStoreUrl',
+        'onlineStorePreviewUrl',
         'variant',
+        'updatedAt',
+        'lastSyncedAt',
     ];
 
     // -------------------------------
@@ -146,6 +169,24 @@ class Product extends Model
         );
     }
 
+    protected function updatedAt(): Attribute
+    {
+        return Attribute::make(
+            get: fn($v, $a) => isset($a['remote_updated_at'])
+                ? Carbon::parse($a['remote_updated_at'])->toISOString()
+                : null
+        );
+    }
+
+    protected function lastSyncedAt(): Attribute
+    {
+        return Attribute::make(
+            get: fn($v, $a) => isset($a['last_synced_at'])
+                ? Carbon::parse($a['last_synced_at'])->toISOString()
+                : null
+        );
+    }
+
     // -------------------------------
     // Helper: API shape identical to "live"
     // -------------------------------
@@ -174,6 +215,8 @@ class Product extends Model
             'onlineStoreUrl' => $this->onlineStoreUrl,
             'onlineStorePreviewUrl' => $this->onlineStorePreviewUrl,
             'status' => $this->getAttribute('status'),
+            'updatedAt' => $this->updatedAt,
+            'lastSyncedAt' => $this->lastSyncedAt,
         ];
     }
 }

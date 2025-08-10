@@ -44,6 +44,13 @@ export const statusColor = (s) => {
     }
 }
 
+export const formatDateTime = (v) => {
+    if (!v) return '—'
+    const d = new Date(v)
+    if (Number.isNaN(d.getTime())) return v
+    return d.toLocaleString()
+}
+
 export const allowedSortKeys = new Set([
     'title',
     'category',

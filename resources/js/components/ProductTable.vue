@@ -69,6 +69,16 @@
             </v-chip>
         </template>
 
+        <!-- Synced (Local) -->
+        <template #item.lastSyncedAt="{ item }">
+            {{ formatDateTime(item.lastSyncedAt) }}
+        </template>
+
+        <!-- Shop Updated (из Shopify) -->
+        <template #item.updatedAt="{ item }">
+            {{ formatDateTime(item.updatedAt) }}
+        </template>
+
         <!-- Actions -->
         <template #item.actions="{ item }">
             <v-btn
@@ -106,6 +116,7 @@ import {
     currency,
     money,
     publicUrl,
+    formatDateTime,
     statusColor,
 } from '@/utils/productHelpers.js'
 
@@ -129,6 +140,8 @@ const defaultHeaders = [
     {title: 'Price', key: 'priceSort', sortable: false},
     {title: 'Total', key: 'total', sortable: false},
     {title: 'Status', key: 'status', sortable: false},
+    {title: 'Synced (Local)', key: 'lastSyncedAt', sortable: false},
+    {title: 'Shop Updated', key: 'updatedAt', sortable: false},
     {title: 'Actions', key: 'actions', sortable: false},
 ]
 

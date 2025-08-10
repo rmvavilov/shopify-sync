@@ -2,8 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Shopify\Services\SyncService as ShopifySyncService;
 use App\Shopify\Client\ShopifyClient;
+use App\Shopify\Services\SyncService as ShopifySyncService;
+use App\Shopify\Queries\ProductFragments;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
@@ -53,62 +54,13 @@ class ShopifySyncCommand extends Command
 
         $queryString = $parts ? implode(' ', $parts) : null;
 
-        $gql = <<<'GQL'
+        $gql = ProductFragments::fields() . <<<'GQL'
 query SyncProducts($first:Int!, $after:String, $query:String) {
   products(first:$first, after:$after, sortKey:UPDATED_AT, reverse:true, query:$query) {
     pageInfo { hasNextPage endCursor }
     edges {
       cursor
-      node {
-        id
-        title
-        descriptionHtml
-        handle
-        status
-        productType
-        totalInventory
-
-        priceRangeV2 {
-          minVariantPrice { amount currencyCode }
-          maxVariantPrice { amount currencyCode }
-        }
-
-        featuredMedia {
-          ... on MediaImage {
-            image   { url(transform:{maxWidth:360}) altText width height }
-            preview { image { url(transform:{maxWidth:800}) altText width height } }
-          }
-          ... on Video        { preview { image { url(transform:{maxWidth:800}) altText width height } } }
-          ... on ExternalVideo{ preview { image { url(transform:{maxWidth:800}) altText width height } } }
-          ... on Model3d      { preview { image { url(transform:{maxWidth:800}) altText width height } } }
-        }
-
-        media(first:2) {
-          nodes {
-            ... on MediaImage {
-              image   { url(transform:{maxWidth:800}) altText width height }
-              preview { image { url(transform:{maxWidth:800}) altText width height } }
-            }
-            ... on Video        { preview { image { url(transform:{maxWidth:800}) altText width height } } }
-            ... on ExternalVideo{ preview { image { url(transform:{maxWidth:800}) altText width height } } }
-            ... on Model3d      { preview { image { url(transform:{maxWidth:800}) altText width height } } }
-          }
-        }
-
-        variants(first:1) {
-          edges {
-            node {
-              id
-              price            # scalar Money
-              compareAtPrice   # scalar Money
-              image { url(transform:{maxWidth:800}) altText width height }
-            }
-          }
-        }
-
-        onlineStoreUrl
-        onlineStorePreviewUrl
-      }
+      node { ...ProductFields }
     }
   }
 }
@@ -119,15 +71,9 @@ GQL;
         $lastCursor = $after;
 
         $this->info('Starting Shopify sync...');
-        if ($queryString) {
-            $this->line("Query: {$queryString}");
-        }
-        if ($after) {
-            $this->line("Resume after cursor: {$after}");
-        }
-        if ($dry) {
-            $this->warn('DRY-RUN mode: DB will not be updated.');
-        }
+        if ($queryString) $this->line("Query: {$queryString}");
+        if ($after) $this->line("Resume after cursor: {$after}");
+        if ($dry) $this->warn('DRY-RUN mode: DB will not be updated.');
 
         while (true) {
             $page++;
@@ -158,7 +104,7 @@ GQL;
                 $count++;
 
                 if (!$dry) {
-                    $sync->upsertFromShopifyNode($node);
+                    $sync->upsertFromShopifyNode($node, 'sync', null);
                 }
 
                 $totalSynced++;

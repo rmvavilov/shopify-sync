@@ -52,6 +52,7 @@ class ProductTransformer
             'onlineStorePreviewUrl' => Arr::get($node, 'onlineStorePreviewUrl'),
             'status' => Arr::get($node, 'status'),
             'cursor' => $cursor,
+            'updatedAt' => Arr::get($node, 'updatedAt'), // Shopify ISO8601
         ];
     }
 

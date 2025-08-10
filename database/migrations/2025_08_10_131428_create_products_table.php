@@ -39,6 +39,11 @@ return new class extends Migration {
             $table->decimal('variant_compare_at', 12, 2)->nullable();
             $table->string('variant_image')->nullable();
 
+            $table->enum('last_sync_source', ['sync', 'webhook'])->nullable()->index();
+            $table->string('last_webhook_id', 64)->nullable()->index();
+
+            $table->timestamp('remote_updated_at')->nullable()->index();
+            $table->timestamp('last_synced_at')->nullable()->index();
             $table->timestamps();
         });
     }
