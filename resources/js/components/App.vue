@@ -1,28 +1,44 @@
 <template>
-    <div>
-        <header style="display:flex;gap:1rem;align-items:center; padding:12px; border-bottom:1px solid #eee;">
-            <strong>Laravel + Vue SPA</strong>
-            <nav style="display:flex; gap:0.5rem;">
-                <RouterLink to="/dashboard">Dashboard</RouterLink>
-                <RouterLink to="/products">Products</RouterLink>
-            </nav>
-            <div style="margin-left:auto;">
-                <template v-if="userStore.isAuthenticated">
-                    <span style="margin-right:8px;">{{ userStore.user?.name }}</span>
-                    <button @click="userStore.logout()">Logout</button>
-                </template>
-                <template v-else>
-                    <RouterLink to="/login">Login</RouterLink>
-                </template>
-            </div>
-        </header>
-        <main style="padding:16px;">
-            <RouterView />
-        </main>
-    </div>
+    <v-app>
+        <v-app-bar flat>
+            <v-app-bar-title>Laravel/Vue/Vuetify/Shopify</v-app-bar-title>
+
+            <template v-if="user.isAuthenticated">
+                <v-btn variant="text" :to="{ name: 'dashboard' }">Dashboard</v-btn>
+                <v-btn variant="text" :to="{ name: 'products' }">Products</v-btn>
+            </template>
+
+
+            <v-spacer />
+
+            <template v-if="user.isAuthenticated">
+                <v-chip class="mr-2" prepend-icon="mdi-account" color="primary" variant="tonal">
+                    {{ user.user?.name }}
+                </v-chip>
+                <v-btn @click="onLogout" color="primary" prepend-icon="mdi-logout">Logout</v-btn>
+            </template>
+            <template v-else>
+                <v-btn :to="{ name: 'login' }" color="primary" prepend-icon="mdi-login">Login</v-btn>
+            </template>
+        </v-app-bar>
+
+        <v-main>
+            <v-container class="py-6">
+                <RouterView />
+            </v-container>
+        </v-main>
+    </v-app>
 </template>
 
 <script setup>
 import { useUserStore } from '../stores/user'
-const userStore = useUserStore()
+const user = useUserStore()
+
+const onLogout = async () => {
+    try {
+        await user.logout()
+    } catch (e) {
+        console.error(e)
+    }
+}
 </script>

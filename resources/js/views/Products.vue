@@ -1,49 +1,184 @@
 <template>
     <div>
-        <h2>Products</h2>
-        <div style="display:flex; gap:8px; margin-bottom:12px;">
-            <button @click="load" :disabled="loading">{{ loading ? 'Loading...' : 'Reload' }}</button>
-            <button v-if="mode==='local'" @click="sync" :disabled="syncing">{{ syncing ? 'Syncing...' : 'Sync from Shopify' }}</button>
+        <div class="d-flex align-center mb-4" style="gap: 8px;">
+            <v-btn color="primary" @click="load" :loading="loading" prepend-icon="mdi-refresh">Reload</v-btn>
+            <v-spacer/>
+            <v-text-field
+                v-model="q"
+                density="compact"
+                variant="outlined"
+                prepend-inner-icon="mdi-magnify"
+                label="Search"
+                clearable
+                hide-details
+                style="max-width: 320px"
+            />
         </div>
-        <p v-if="error" style="color:red;">{{ error }}</p>
 
-        <ul v-if="items.length">
-            <li v-for="p in items" :key="p.id" style="padding:8px 0; border-bottom:1px solid #eee;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <strong>{{ p.title }}</strong>
-                        <div v-html="p.description" />
-                        <small>Category: {{ p.category || '—' }}</small>
-                    </div>
-                    <div style="display:flex; gap:8px;">
-                        <button @click="remove(p)" v-if="mode==='local'">Delete (local)</button>
-                    </div>
+        <v-data-table
+            :headers="headers"
+            :items="filteredItems"
+            :loading="loading"
+            :items-per-page="10"
+            class="elevation-1"
+            hover
+        >
+            <template #item.image="{ item }">
+                <v-avatar size="48" rounded="lg">
+                    <v-img :src="item.image || item.imageVariant || placeholder" alt=""/>
+                </v-avatar>
+            </template>
+
+            <template #item.title="{ item }">
+                <div class="d-flex flex-column">
+                    <span class="font-weight-medium">{{ item.title }}</span>
+                    <span class="text-caption text-medium-emphasis" v-if="item.handle">/{{ item.handle }}</span>
                 </div>
-            </li>
-        </ul>
+            </template>
 
-        <p v-else>No Data. Please try again.</p>
+            <template #item.category="{ item }">
+                <v-chip v-if="item.category" size="small" variant="tonal">{{ item.category }}</v-chip>
+                <span v-else>—</span>
+            </template>
+
+            <template #item.priceSort="{ item }">
+                <template v-if="priceMin(item) != null">
+                    <v-chip color="primary" variant="flat" size="small">
+                        {{ money(priceMin(item), currency(item)) }}
+                        <template v-if="priceMax(item) != null && priceMax(item) !== priceMin(item)">
+                            — {{ money(priceMax(item), currency(item)) }}
+                        </template>
+                    </v-chip>
+                </template>
+                <span v-else>—</span>
+            </template>
+
+            <template #item.total="{ item }">
+                {{ item.total ?? '—' }}
+            </template>
+
+            <template #item.status="{ item }">
+                <v-chip
+                    size="small"
+                    :color="statusColor(item.status)"
+                    :variant="item.status ? 'tonal' : 'text'"
+                >
+                    {{ item.status || '—' }}
+                </v-chip>
+            </template>
+
+            <template #item.actions="{ item }">
+                <v-btn
+                    :href="publicUrl(item) || '#'"
+                    :disabled="!publicUrl(item)"
+                    target="_blank"
+                    rel="noopener"
+                    variant="text"
+                    size="small"
+                    prepend-icon="mdi-open-in-new"
+                >
+                    Open
+                </v-btn>
+            </template>
+
+            <template #loading>
+                <v-skeleton-loader class="mx-2 my-4" type="table"/>
+            </template>
+
+            <template #no-data>
+                <v-alert type="info" variant="tonal">No products - reload.</v-alert>
+            </template>
+        </v-data-table>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import {ref, computed, onMounted} from 'vue'
 
 const items = ref([])
-const error = ref('')
 const loading = ref(false)
-const syncing = ref(false)
+const q = ref('')
 const mode = ref('proxy') // TODO: remove hardcode fetch from backend
+const placeholder = 'https://via.placeholder.com/120x120?text=No+Image'
+
+const headers = [
+    {title: 'Image', key: 'image', sortable: false},
+    {title: 'Title', key: 'title'},
+    {title: 'Category', key: 'category'},
+    {title: 'Price', key: 'priceSort'},
+    {title: 'Total', key: 'total'},
+    {title: 'Status', key: 'status'},
+    {title: 'Actions', key: 'actions', sortable: false},
+]
+
+const filteredItems = computed(() => {
+    const needle = q.value.trim().toLowerCase()
+    if (!needle) return withComputed(items.value)
+    return withComputed(items.value).filter(p =>
+        (p.title || '').toLowerCase().includes(needle) ||
+        (p.category || '').toLowerCase().includes(needle) ||
+        (p.handle || '').toLowerCase().includes(needle) ||
+        (p.status || '').toLowerCase().includes(needle)
+    )
+})
+
+function withComputed(arr) {
+    return arr.map(p => ({
+        ...p,
+        // priceSort: min price if exists; else variant.price; else null
+        priceSort: priceMin(p) ?? null,
+    }))
+}
+
+const priceMin = (p) => {
+    if (p?.priceMin != null) return Number(p.priceMin)
+    if (p?.variant?.price != null) return Number(p.variant.price)
+    return null
+}
+const priceMax = (p) => (p?.priceMax != null ? Number(p.priceMax) : null)
+const currency = (p) => p?.currency || p?.variant?.currency || undefined
+
+const money = (amount, curr) => {
+    if (amount == null) return '—'
+    try {
+        return curr
+            ? new Intl.NumberFormat(undefined, {style: 'currency', currency: curr}).format(Number(amount))
+            : new Intl.NumberFormat(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(Number(amount))
+    } catch {
+        return String(amount)
+    }
+}
+
+const publicUrl = (p) => p?.onlineStoreUrl || p?.onlineStorePreviewUrl || null
+
+const statusColor = (s) => {
+    switch ((s || '').toUpperCase()) {
+        case 'ACTIVE':
+            return 'success'
+        case 'DRAFT':
+            return 'warning'
+        case 'ARCHIVED':
+            return 'grey'
+        default:
+            return 'secondary'
+    }
+}
 
 const load = async () => {
     loading.value = true
-    error.value = ''
     try {
-        const res = await fetch('/api/shopify/products', { credentials: 'same-origin' })
+        const res = await fetch('/api/shopify/products', {credentials: 'same-origin'})
         if (!res.ok) throw new Error('Failed to load products')
-        items.value = await res.json()
+        const data = await res.json()
+        const a = Array.isArray(data) ? data : []
+        console.log(a)
+        items.value = a
     } catch (e) {
-        error.value = e.message
+        console.error(e)
+        items.value = []
     } finally {
         loading.value = false
     }

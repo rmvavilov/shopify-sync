@@ -70,7 +70,7 @@ query GetProducts($first:Int!) {
 }
 GQL;
 
-        $data = $client->graphql($query, ['first' => 20]);
+        $data = $client->graphql($query, ['first' => 10]);
 
         // TODO: move local/proxy to separate methods
         // foreach (($data['data']['products']['edges'] ?? []) as $edge) {
