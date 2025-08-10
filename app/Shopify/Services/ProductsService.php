@@ -23,34 +23,37 @@ class ProductsService
         $page = max(1, (int)$request->integer('page', 1));
         $per = min(max((int)$request->integer('itemsPerPage', 10), 1), 100);
         $q = trim((string)$request->get('q', ''));
-        $sortBy = $request->input('sortBy', []);
+        $sortBy = (array)$request->input('sortBy', []);
         $primarySort = $sortBy[0] ?? ['key' => 'updated_at', 'order' => 'desc'];
-        $key = $primarySort['key'] ?? 'updated_at';
-        $dir = ($primarySort['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        $key = (string)($primarySort['key'] ?? 'updated_at');
+        $dir = strtolower((string)($primarySort['order'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $qb = Product::query();
 
         if ($q !== '') {
             $qb->where(function ($w) use ($q) {
                 $w->where('title', 'like', "%{$q}%")
-                    ->orWhere('productType', 'like', "%{$q}%")
-                    ->orWhere('description', 'like', "%{$q}%");
+                    ->orWhere('product_type', 'like', "%{$q}%")
+                    ->orWhere('description', 'like', "%{$q}%")
+                    ->orWhere('handle', 'like', "%{$q}%")
+                    ->orWhere('status', 'like', "%{$q}%")
+                    ->orWhere('shopify_id', 'like', "%{$q}%");
             });
         }
 
-        $map = [
+        $sortMap = [
             'title' => 'title',
-            'category' => 'productType',
+            'category' => 'product_type',
             'created_at' => 'created_at',
             'updated_at' => 'updated_at',
-            'id' => 'id',
+            'id' => 'shopify_id',
         ];
-        $qb->orderBy($map[$key] ?? 'id', $dir);
+        $qb->orderBy($sortMap[$key] ?? 'id', $dir);
 
-        $total = $qb->count();
-        $rows = $qb->skip(($page - 1) * $per)->take($per)->get();
+        $total = (clone $qb)->count();
+        $rows = $qb->forPage($page, $per)->get();
 
-        $items = $rows->map(fn($p) => ProductTransformer::fromLocalModel($p))->values();
+        $items = $rows->map(fn(Product $p) => $p->toApiProduct())->values();
 
         return [
             'mode' => 'local',

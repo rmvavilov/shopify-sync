@@ -12,10 +12,33 @@ return new class extends Migration {
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
-            $table->string('shopify_id')->unique();
-            $table->string('title');
-            $table->text('description')->nullable();
-            $table->string('category')->nullable();
+
+            $table->string('shopify_id')->unique()->nullable();
+            $table->string('handle')->nullable()->index();
+            $table->string('status')->nullable()->index();
+
+            $table->string('title')->nullable()->index();
+            $table->longText('description')->nullable();
+            $table->string('product_type')->nullable()->index();
+
+            $table->integer('total_inventory')->nullable();
+
+            $table->decimal('price_min', 12, 2)->nullable();
+            $table->decimal('price_max', 12, 2)->nullable();
+            $table->string('currency', 8)->nullable();
+
+            $table->string('image')->nullable();
+            $table->string('image_alt')->nullable();
+            $table->string('image_variant')->nullable();
+
+            $table->text('online_store_url')->nullable();
+            $table->text('online_store_preview_url')->nullable();
+
+            $table->string('variant_id')->nullable();
+            $table->decimal('variant_price', 12, 2)->nullable();
+            $table->decimal('variant_compare_at', 12, 2)->nullable();
+            $table->string('variant_image')->nullable();
+
             $table->timestamps();
         });
     }
