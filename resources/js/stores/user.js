@@ -1,6 +1,11 @@
 import {defineStore} from 'pinia'
 import router from '@/router'
 
+function getCookie(name) {
+    const m = document.cookie.split('; ').find(r => r.startsWith(name + '='))
+    return m ? decodeURIComponent(m.split('=')[1]) : ''
+}
+
 export const useUserStore = defineStore('user', {
     state: () => ({
         user: null,
@@ -16,9 +21,7 @@ export const useUserStore = defineStore('user', {
         },
         async fetchMe() {
             try {
-                const res = await fetch('/api/me', {
-                    credentials: 'same-origin',
-                })
+                const res = await fetch('/api/me', {credentials: 'same-origin'})
                 if (res.ok) {
                     this.user = await res.json()
                 } else {
@@ -48,32 +51,37 @@ export const useUserStore = defineStore('user', {
             await this.fetchMe()
         },
         async logout() {
-            const token = await this.getCsrfToken()
-            const res = await fetch('/logout', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRF-TOKEN': token,
-                    'Accept': 'application/json',
-                },
-            })
+            const postLogout = async () => {
+                const xsrf = getCookie('XSRF-TOKEN')
+                return fetch('/logout', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-XSRF-TOKEN': xsrf,
+                        'Accept': 'application/json',
+                    },
+                })
+            }
+
+            let res = await postLogout()
 
             if (res.status === 419) {
-                alert(1);
-                this.user = null
-                // window.location.href = '/login'
-                await router.replace({name: 'login'})
-                return
+                try {
+                    await fetch('/', {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                } catch {
+                }
+                res = await postLogout()
             }
+
             if (!res.ok && res.status !== 204) {
-                alert(2);
                 const data = await res.json().catch(() => ({}))
-                throw new Error(data.message || 'Logout failed')
+                throw new Error(data.message || `Logout failed (${res.status})`)
             }
 
             this.user = null
             this.initialized = true
-            await router.replace({name: 'login'})
+            window.location.assign('/login')
         },
     },
 })
